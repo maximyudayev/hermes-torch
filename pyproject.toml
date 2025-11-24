@@ -3,18 +3,15 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-# TODO: replace `pkgname` and version number
-name = "pysio-hermes-pkgname"
-version = "0.0.1"
+name = "pysio-hermes-torch"
+dynamic = ["version"]
 requires-python = ">=3.7"
 authors = [
   { name="Maxim Yudayev", email="maxim.yudayev@gmail.com" },
   { name="e-Media Research Lab @ KU Leuven" },
 ]
-# TODO: update the package description
-description = "A realtime physiological sensing and edge AI processing framework"
-# TODO: add tags
-keywords = ["embedded ai", "wearables", "sensors", "streaming", "realtime processing", "physiology"]
+description = "A PyTorch processing support module for HERMES"
+keywords = ["embedded ai", "wearables", "sensors", "closed-loop", "pytorch", "streaming", "realtime processing", "physiology"]
 readme = { file = "README.md", content-type = "text/markdown" }
 license = "MIT"
 license-files = ["LICENSE"]
@@ -31,15 +28,17 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Medical Science Apps.",
   "Topic :: System :: Distributed Computing"
 ]
-# TODO: add package dependencies
 dependencies = [
-
+  "pysio-hermes",
+  "torch"
 ]
 
+[tool.setuptools.dynamic]
+version = {attr = "hermes.torch.__version__.__version__"}
+
 [project.urls]
-# TODO: update external links
 Homepage = "https://maximyudayev.github.io/hermes"
 Documentation = "https://maximyudayev.github.io/hermes"
-Repository = "https://github.com/maximyudayev/hermes.git"
+Repository = "https://github.com/maximyudayev/hermes-torch.git"
 Issues = "https://github.com/maximyudayev/hermes/issues"
-Changelog = "https://github.com/maximyudayev/hermes/blob/main/CHANGELOG.md"
+Changelog = "https://github.com/maximyudayev/hermes-torch/blob/main/CHANGELOG.md"

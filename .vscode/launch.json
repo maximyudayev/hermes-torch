@@ -5,15 +5,15 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Local Template",
+      "name": "Local Torch",
       "type": "debugpy",
       "request": "launch",
       "cwd": "${workspaceFolder}",
       "program": "examples/main.py",
       "args": [
-        "--experiment", "project=Test", "type=Template", "trial=0",
-        "--config_file", "examples/template.yml",
-        "--out_dir", "examples/"
+        "--experiment", "project=Test", "type=Torch", "trial=0",
+        "--config_file", "examples/torch.yml",
+        "--out_dir", "examples/data"
       ],
       "env": {
         "PYTHONPATH": "${workspaceFolder}"
