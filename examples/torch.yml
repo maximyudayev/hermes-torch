@@ -35,6 +35,7 @@ remote_publisher_ips: []
 is_remote_kill: False
 remote_kill_ip: null
 
+duration_s: null
 
 logging_spec:
   stream_period_s     : 30
@@ -49,8 +50,8 @@ logging_spec:
   dump_video          : False
   dump_audio          : False
 
-video_codec_config_filepath : "examples/video_codec.yml" 
-audio_codec_config_filepath : "examples/audio_codec.yml" 
+video_codec_config_filepath : null 
+audio_codec_config_filepath : null 
 
 
 producer_specs:
@@ -84,17 +85,25 @@ pipeline_specs:
   - package: "torch"
     class: "TorchProducer"
     settings:
-      model_path: "example/tcn_model_60fps.pth"
-      sampling_rate_hz: 60
+      module_path: "torch_tcn/model.py"
+      module_name: ""
+      class_name: ""
+      checkpoint_path: "torch_tcn/tcn_model_60fps.pth"
+      module_params: {}
+
+
+
       input_size:
         - 5
         - 6
       output_classes:
         - "none"
         - "freezing"
-      stream_specs: 
+
+
+      stream_in_specs: 
         - package: "dots"
-          class: "DotsProducer"
+          class: "DotsOemProducer"
           settings:
             device_mapping:
               pelvis          : "40195BFD8029009B"

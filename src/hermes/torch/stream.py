@@ -42,93 +42,42 @@ class TorchStream(Stream):
         super().__init__()
 
         self._classes = classes
+        self._device_name = "pytorch"
         self._define_data_notes()
 
         self.add_stream(
-            device_name="pytorch-worker",
+            device_name=self._device_name,
             stream_name="prediction",
             data_type="uint16",
             sample_size=(1,),
             sampling_rate_hz=sampling_rate_hz,
+            data_notes=self._data_notes[self._device_name]["prediction"],
             is_measure_rate_hz=True,
-            data_notes=self._data_notes["pytorch-worker"]["prediction"],
         )
         self.add_stream(
-            device_name="pytorch-worker",
+            device_name=self._device_name,
             stream_name="logits",
             data_type="float64",
             sample_size=(len(classes),),
-            data_notes=self._data_notes["pytorch-worker"]["logits"],
-        )
-        self.add_stream(
-            device_name="pytorch-worker",
-            stream_name="inference_latency_s",
-            data_type="float64",
-            sample_size=(1,),
-            data_notes=self._data_notes["pytorch-worker"]["inference_latency_s"],
-        )
-        self.add_stream(
-            device_name="pytorch-worker",
-            stream_name="delay_since_first_sensor_s",
-            data_type="float64",
-            sample_size=(1,),
-            data_notes=self._data_notes["pytorch-worker"]["delay_since_first_sensor_s"],
-        )
-        self.add_stream(
-            device_name="pytorch-worker",
-            stream_name="delay_since_snapshot_ready_s",
-            data_type="float64",
-            sample_size=(1,),
-            data_notes=self._data_notes["pytorch-worker"][
-                "delay_since_snapshot_ready_s"
-            ],
+            data_notes=self._data_notes[self._device_name]["logits"],
         )
 
     def get_fps(self) -> dict[str, float | None]:
-        return {"pytorch-worker": super()._get_fps("pytorch-worker", "prediction")}
+        return {self._device_name: super()._get_fps(self._device_name, "prediction")}
 
     def _define_data_notes(self) -> None:
         self._data_notes = {}
-        self._data_notes.setdefault("pytorch-worker", {})
+        self._data_notes.setdefault(self._device_name, {})
 
-        self._data_notes["pytorch-worker"]["logits"] = OrderedDict(
+        self._data_notes[self._device_name]["logits"] = OrderedDict(
             [
                 ("Description", "Probability vector"),
                 ("Range", "[0,1]"),
                 (Stream.metadata_data_headings_key, self._classes),
             ]
         )
-        self._data_notes["pytorch-worker"]["prediction"] = OrderedDict(
+        self._data_notes[self._device_name]["prediction"] = OrderedDict(
             [
                 ("Description", "Label of the most likely class prediction"),
             ]
-        )
-        self._data_notes["pytorch-worker"]["inference_latency_s"] = OrderedDict(
-            [
-                (
-                    "Description",
-                    "Amount of time it took for the forward pass for the new sample w.r.t. system clock",
-                ),
-                ("Units", "seconds"),
-            ]
-        )
-        self._data_notes["pytorch-worker"]["delay_since_first_sensor_s"] = OrderedDict(
-            [
-                (
-                    "Description",
-                    "Amount of time between arrival of the 1st sensor packet and inference start",
-                ),
-                ("Units", "seconds"),
-            ]
-        )
-        self._data_notes["pytorch-worker"]["delay_since_snapshot_ready_s"] = (
-            OrderedDict(
-                [
-                    (
-                        "Description",
-                        "Amount of time between availability of the full sensor snapshot and inference start",
-                    ),
-                    ("Units", "seconds"),
-                ]
-            )
         )

@@ -25,13 +25,14 @@
 #
 # ############
 
-from hermes.utils.types import LoggingSpec
+from multiprocessing import Queue
+from typing import Any
 import numpy as np
-from collections import deque
 import torch
-from torch import nn
+from torch.nn import Module
 
 from hermes.base.nodes.pipeline import Pipeline
+from hermes.utils.types import LoggingSpec
 from hermes.utils.time_utils import get_time
 from hermes.utils.zmq_utils import (
     PORT_BACKEND,
@@ -40,16 +41,14 @@ from hermes.utils.zmq_utils import (
     PORT_KILL,
 )
 
-from hermes.torch.stream import TorchStream
+from .stream import TorchStream
+from .utils import build_model
 
 
 class TorchPipeline(Pipeline):
-    """A class for processing sensor data with an AI model.
+    """A class for processing realtime sensor data with a PyTorch AI model."""
 
-    TODO: Keep the module fixed, instantiate PyTorch
-          model as an object from user parameters.
-    """
-
+    # TODO: make the log name assignable?
     @classmethod
     def _log_source_tag(cls) -> str:
         return "ai"
@@ -57,57 +56,43 @@ class TorchPipeline(Pipeline):
     def __init__(
         self,
         host_ip: str,
+        logging_spec: LoggingSpec,
         stream_in_specs: list[dict],
-        model_path: str,
+        module_path: str,
+        module_name: str,
+        class_name: str,
+        module_params: dict,
+        checkpoint_path: str,
         input_size: tuple[int, int],
         output_classes: list[str],
-        sampling_rate_hz: int,
-        logging_spec: LoggingSpec,
         port_pub: str = PORT_BACKEND,
         port_sub: str = PORT_FRONTEND,
         port_sync: str = PORT_SYNC_HOST,
         port_killsig: str = PORT_KILL,
-        **_
+        **_,
     ):
-
-        self._model: nn.Module = TCN(
-            num_inputs=30,
-            num_channels=[16, 32, 32, 32, 16],
-            kernel_size=3,
-            dropout=0.1,
-            output_projection=2,
-            output_activation=None,
-            causal=True,
+        self._model: Module = build_model(
+            module_path,
+            module_name,
+            class_name,
+            module_params,
+            checkpoint_path,
         )
-        self._model.load_state_dict(
-            torch.load(model_path, map_location="cpu", weights_only=True)
-        )
+        # Inference-only mode.
         self._model.eval()
-        # to keep the latest valid IMU sample (because at some time frames a single IMU sample can be None).
-        self._buffer: list[deque[np.ndarray]] = [
-            deque([np.zeros(input_size[1])], maxlen=1) for _ in range(input_size[0])
-        ]
-        # Globally turn off gradient calculation. Inference-only mode.
+        # Globally turn off gradient accumulation.
         torch.set_grad_enabled(False)
 
-        # Initialize any state that the sensor needs.
+        # TODO: wrap AI compute in a separate process.
+
+        # TODO: buffer N latest samples of each modality (user configurable).
+        self._buffer: dict[str, Queue[Any]] = [
+            deque([np.zeros(input_size[1])], maxlen=1) for _ in range(input_size[0])
+        ]
+
         stream_out_spec = {
             "classes": output_classes,
-            "sampling_rate_hz": sampling_rate_hz,
         }
-
-        # Initialize highpass filter
-        self.b, self.a, self.zi = init_iir_filter(
-            fs=sampling_rate_hz, cutoff_hz=0.3, order=4, num_channels=input_size[1]
-        )
-
-        # Initialize vars needed for pre-processing: (x-mean)/std
-        self._mean = np.zeros(6, dtype=np.float32)
-        self._var = np.ones(6, dtype=np.float32)
-        self._count = 0
-
-        # to keep state for label smoothing
-        self.smooth_state = (False, 0, 0)  # (in_fog, consec_ones, consec_zeros)
 
         super().__init__(
             host_ip=host_ip,
@@ -124,48 +109,14 @@ class TorchPipeline(Pipeline):
     def create_stream(cls, stream_spec: dict) -> TorchStream:
         return TorchStream(**stream_spec)
 
-    def _generate_prediction(self) -> tuple[list[float], int]:
-        input_tensor = torch.tensor(
-            np.concatenate([buf[0] for buf in self._buffer]), dtype=torch.float32
-        )[None, :, None]
-        output = self._model(input_tensor, inference=True)
-        logits = output.squeeze().numpy()
-        prediction = output.squeeze().argmax().item()
-        prediction, self.smooth_state = smooth(prediction, self.smooth_state)
-        return logits, prediction
-
     def _process_data(self, topic: str, msg: dict) -> None:
-        acc = msg["data"]["dots-imu"]["acceleration"]
-        gyr = msg["data"]["dots-imu"]["gyroscope"]
-        toa_s = msg["data"]["dots-imu"]["toa_s"]
-
-        for i, sensor_sample in enumerate(np.concatenate((acc, gyr), axis=1)):
-            if all(map(lambda el: not np.isnan(el), sensor_sample)):
-                norm_sample, self.zi, self._count, self._mean, self._var = normalize(
-                    sensor_sample,
-                    self.b,
-                    self.a,
-                    self.zi,
-                    self._count,
-                    self._mean,
-                    self._var,
-                )
-                self._buffer[i].append(norm_sample)
-
+        # TODO: put data in the queues.
         start_time_s: float = get_time()
-        logits, prediction = self._generate_prediction()
+        logits, prediction = self._model()
         end_time_s: float = get_time()
 
-        data = {
-            "logits": logits,
-            "prediction": prediction,
-            "inference_latency_s": end_time_s - start_time_s,
-            "delay_since_first_sensor_s": start_time_s - np.min(toa_s),
-            "delay_since_snapshot_ready_s": start_time_s - msg["process_time_s"],
-        }
-
         tag: str = "%s.data" % self._log_source_tag()
-        self._publish(tag, process_time_s=end_time_s, data={"pytorch-worker": data})
+        self._publish(tag, process_time_s=end_time_s, data={"pytorch": data})
 
     def _stop_new_data(self):
         pass
