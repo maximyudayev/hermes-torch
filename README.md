@@ -20,7 +20,7 @@ pip install -e hermes-torch
 ```
 
 ## Usage
-Using PyTorch AI models follows the standard [configuration file specification](https://maximyudayev.github.io/hermes/) process of HERMES nodes.
+Using PyTorch AI models follows the standard [configuration file specification](https://yudayev.com/hermes) process of HERMES nodes.
 
 1. Prepare your PyTorch model in a regular workflow - design, train, and export a `.pth` checkpoint.
 1. Provide the path in the HERMES config file to both, the checkpoint file and the module containing the `nn.Module` architecture.

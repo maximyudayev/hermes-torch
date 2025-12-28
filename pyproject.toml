@@ -8,7 +8,7 @@ dynamic = ["version"]
 requires-python = ">=3.7"
 authors = [
   { name="Maxim Yudayev", email="maxim.yudayev@gmail.com" },
-  { name="e-Media Research Lab @ KU Leuven" },
+  { name="e-Media Research Lab @ KU Leuven", email="emedia@kuleuven.be" },
 ]
 description = "A PyTorch processing support module for HERMES"
 keywords = ["embedded ai", "wearables", "sensors", "closed-loop", "pytorch", "streaming", "realtime processing", "physiology"]
@@ -37,8 +37,8 @@ dependencies = [
 version = {attr = "hermes.torch.__version__.__version__"}
 
 [project.urls]
-Homepage = "https://maximyudayev.github.io/hermes"
-Documentation = "https://maximyudayev.github.io/hermes"
+Homepage = "https://yudayev.com/hermes"
+Documentation = "https://yudayev.com/hermes"
 Repository = "https://github.com/maximyudayev/hermes-torch.git"
 Issues = "https://github.com/maximyudayev/hermes/issues"
 Changelog = "https://github.com/maximyudayev/hermes-torch/blob/main/CHANGELOG.md"
