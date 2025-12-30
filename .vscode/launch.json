@@ -11,9 +11,9 @@
       "cwd": "${workspaceFolder}",
       "program": "examples/main.py",
       "args": [
-        "--experiment", "project=Test", "type=Torch", "trial=0",
-        "--config_file", "examples/torch.yml",
-        "--out_dir", "examples/data"
+        "-e", "project=Test", "type=Torch", "trial=0",
+        "-o", "examples/data",
+        "-f", "examples/torch.yml",
       ],
       "env": {
         "PYTHONPATH": "${workspaceFolder}"

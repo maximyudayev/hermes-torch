@@ -25,9 +25,6 @@
 #
 # ############
 
-from multiprocessing import Queue
-from typing import Any
-import numpy as np
 import torch
 from torch.nn import Module
 
@@ -41,14 +38,14 @@ from hermes.utils.zmq_utils import (
     PORT_KILL,
 )
 
-from .stream import TorchStream
+from .stream import TorchClassifierStream
 from .utils import build_model
 
 
-class TorchPipeline(Pipeline):
-    """A class for processing realtime sensor data with a PyTorch AI model."""
+class TorchClassifierPipeline(Pipeline):
+    """A class for processing realtime sensor data with a custom PyTorch AI model."""
 
-    # TODO: make the log name assignable?
+    # TODO: make the log name assignable.
     @classmethod
     def _log_source_tag(cls) -> str:
         return "ai"
@@ -56,42 +53,31 @@ class TorchPipeline(Pipeline):
     def __init__(
         self,
         host_ip: str,
-        logging_spec: LoggingSpec,
+        stream_out_spec: dict,
         stream_in_specs: list[dict],
-        module_path: str,
-        module_name: str,
-        class_name: str,
-        module_params: dict,
-        checkpoint_path: str,
-        input_size: tuple[int, int],
-        output_classes: list[str],
+        logging_spec: LoggingSpec,
+        is_async_generate: bool = False,
         port_pub: str = PORT_BACKEND,
         port_sub: str = PORT_FRONTEND,
         port_sync: str = PORT_SYNC_HOST,
         port_killsig: str = PORT_KILL,
         **_,
     ):
+        # TODO: wrap AI compute in a separate process to not stall ZeroMQ.
         self._model: Module = build_model(
-            module_path,
-            module_name,
-            class_name,
-            module_params,
-            checkpoint_path,
+            file_path=stream_out_spec["file_path"],
+            class_name=stream_out_spec["class_name"],
+            module_params=stream_out_spec["module_params"],
+            checkpoint_path=stream_out_spec["checkpoint_path"],
         )
         # Inference-only mode.
         self._model.eval()
         # Globally turn off gradient accumulation.
         torch.set_grad_enabled(False)
 
-        # TODO: wrap AI compute in a separate process.
-
-        # TODO: buffer N latest samples of each modality (user configurable).
-        self._buffer: dict[str, Queue[Any]] = [
-            deque([np.zeros(input_size[1])], maxlen=1) for _ in range(input_size[0])
-        ]
-
         stream_out_spec = {
-            "classes": output_classes,
+            "classes": stream_out_spec["module_params"]["output_classes"],
+            "sampling_rate_hz": stream_out_spec["module_params"]["sampling_rate_hz"],
         }
 
         super().__init__(
@@ -99,6 +85,7 @@ class TorchPipeline(Pipeline):
             stream_out_spec=stream_out_spec,
             stream_in_specs=stream_in_specs,
             logging_spec=logging_spec,
+            is_async_generate=is_async_generate,
             port_pub=port_pub,
             port_sub=port_sub,
             port_sync=port_sync,
@@ -106,17 +93,30 @@ class TorchPipeline(Pipeline):
         )
 
     @classmethod
-    def create_stream(cls, stream_spec: dict) -> TorchStream:
-        return TorchStream(**stream_spec)
+    def create_stream(cls, stream_spec: dict) -> TorchClassifierStream:
+        return TorchClassifierStream(**stream_spec)
+
+    def _keep_samples(self):
+        pass
 
     def _process_data(self, topic: str, msg: dict) -> None:
-        # TODO: put data in the queues.
+        # TODO: put data into the IPC queues for PyTorch subprocess to asynchronously compute and not stall ZeroMQ.
+
         start_time_s: float = get_time()
-        logits, prediction = self._model()
+        logits, prediction = self._model(msg["data"])
         end_time_s: float = get_time()
 
+        data = {
+            "prediction": prediction,
+            "logits": logits,
+            "compute_time_s": end_time_s - start_time_s,
+        }
         tag: str = "%s.data" % self._log_source_tag()
-        self._publish(tag, process_time_s=end_time_s, data={"pytorch": data})
+
+        self._publish(tag, process_time_s=end_time_s, data={"classifier": data})
+
+    def _generate_data(self):
+        pass
 
     def _stop_new_data(self):
         pass

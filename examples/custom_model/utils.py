@@ -54,25 +54,25 @@ def init_iir_filter(
     return b, a, zi
 
 
-def normalize(sensor_sample, b, a, zi, count, mean, var, eps=1e-3):
-    # high-pass filter the accelerometer
-    acc = sensor_sample[:3]
+def normalize(sample, b, a, zi, count, mean, var, eps=1e-3):
+    # High-pass filter the accelerometer.
+    acc = sample[:3]
     filtered_acc = np.zeros_like(acc)
     for j in range(3):
         filtered_acc[j], zi[j] = lfilter(b, a, [acc[j]], zi=zi[j])
 
-    sensor_sample = np.concatenate((filtered_acc, sensor_sample[3:]))
+    sample = np.concatenate((filtered_acc, sample[3:]))
 
-    # update running mean and variance (Welford's algorithm)
+    # Update running mean and variance (Welford's algorithm).
     count += 1
-    delta = sensor_sample - mean
+    delta = sample - mean
     mean += delta / count
-    var += (delta * (sensor_sample - mean) - var) / count
+    var += (delta * (sample - mean) - var) / count
 
-    # Normalize: only center gyro (indices 3 to 5)
-    sensor_sample = sensor_sample - np.concatenate([np.zeros(3), mean[3:]])
+    # Normalize: only center gyro (indices 3 to 5).
+    sample = sample - np.concatenate([np.zeros(3), mean[3:]])
     std = np.sqrt(var)
     std = np.clip(std, eps, None)
-    norm_sample = sensor_sample / std
+    norm_sample = sample / std
 
     return norm_sample, zi, count, mean, var

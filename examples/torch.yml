@@ -31,11 +31,11 @@ is_master_broker: True
 
 remote_subscriber_ips: []
 remote_publisher_ips: []
+connections: []
 
 is_remote_kill: False
 remote_kill_ip: null
 
-duration_s: null
 
 logging_spec:
   stream_period_s     : 30
@@ -50,8 +50,8 @@ logging_spec:
   dump_video          : False
   dump_audio          : False
 
-video_codec_config_filepath : null 
-audio_codec_config_filepath : null 
+video_codec_config_filepath : null
+audio_codec_config_filepath : null
 
 
 producer_specs:
@@ -83,25 +83,22 @@ consumer_specs: []
 
 pipeline_specs:
   - package: "torch"
-    class: "TorchProducer"
+    class: "TorchClassifierPipeline"
     settings:
-      module_path: "torch_tcn/model.py"
-      module_name: ""
-      class_name: ""
-      checkpoint_path: "torch_tcn/tcn_model_60fps.pth"
-      module_params: {}
+      stream_out_spec:
+        file_path: "examples/custom_model/model.py"
+        class_name: "TCN"
+        checkpoint_path: "examples/custom_model/tcn_model_60fps.pth"
+        module_params:
+          input_size:
+            - 5
+            - 6
+          output_classes:
+            - "none"
+            - "freezing"
+          sampling_rate_hz: 60
 
-
-
-      input_size:
-        - 5
-        - 6
-      output_classes:
-        - "none"
-        - "freezing"
-
-
-      stream_in_specs: 
+      stream_in_specs:
         - package: "dots"
           class: "DotsOemProducer"
           settings:

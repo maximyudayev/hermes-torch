@@ -26,30 +26,29 @@
 # ############
 
 from collections import OrderedDict
+from math import ceil, log2
 
 from hermes.base.stream import Stream
 
 
-class TorchStream(Stream):
-    """A structure to store PyTorch prediction outputs.
-
-    TODO: use user parameters to specify model
-      output configuration
-      (i.e. classifier, regressor, embedding, etc.)
-    """
+class TorchClassifierStream(Stream):
+    """A structure to store PyTorch prediction outputs."""
 
     def __init__(self, classes: list[str], sampling_rate_hz: float, **_) -> None:
         super().__init__()
 
+        self._device_name = "classifier"
+
         self._classes = classes
-        self._device_name = "pytorch"
+        bit_width = 8 * 2 ** ceil(log2((len(classes).bit_length() + 7) // 8))
+
         self._define_data_notes()
 
         self.add_stream(
             device_name=self._device_name,
             stream_name="prediction",
-            data_type="uint16",
-            sample_size=(1,),
+            data_type=f"uint{bit_width}",
+            sample_size=[1],
             sampling_rate_hz=sampling_rate_hz,
             data_notes=self._data_notes[self._device_name]["prediction"],
             is_measure_rate_hz=True,
@@ -58,8 +57,15 @@ class TorchStream(Stream):
             device_name=self._device_name,
             stream_name="logits",
             data_type="float64",
-            sample_size=(len(classes),),
+            sample_size=[len(classes)],
             data_notes=self._data_notes[self._device_name]["logits"],
+        )
+        self.add_stream(
+            device_name=self._device_name,
+            stream_name="compute_time_s",
+            data_type="float64",
+            sample_size=[1],
+            data_notes=self._data_notes[self._device_name]["compute_time_s"],
         )
 
     def get_fps(self) -> dict[str, float | None]:
@@ -79,5 +85,10 @@ class TorchStream(Stream):
         self._data_notes[self._device_name]["prediction"] = OrderedDict(
             [
                 ("Description", "Label of the most likely class prediction"),
+            ]
+        )
+        self._data_notes[self._device_name]["compute_time_s"] = OrderedDict(
+            [
+                ("Description", "Time in seconds the inference took"),
             ]
         )

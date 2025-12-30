@@ -1,2 +1,2 @@
-from .stream import TorchStream
-from .pipeline import TorchPipeline
+from .stream import TorchClassifierStream
+from .pipeline import TorchClassifierPipeline
