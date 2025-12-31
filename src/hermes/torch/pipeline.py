@@ -25,12 +25,13 @@
 #
 # ############
 
-import torch
-from torch.nn import Module
+from multiprocessing import Process, Event, Queue
+from queue import Empty
+import numpy as np
 
 from hermes.base.nodes.pipeline import Pipeline
 from hermes.utils.types import LoggingSpec
-from hermes.utils.time_utils import get_time
+from hermes.utils.mp_utils import launch_handler
 from hermes.utils.zmq_utils import (
     PORT_BACKEND,
     PORT_FRONTEND,
@@ -39,7 +40,7 @@ from hermes.utils.zmq_utils import (
 )
 
 from .stream import TorchClassifierStream
-from .utils import build_model
+from .handler import TorchClassifierHandler
 
 
 class TorchClassifierPipeline(Pipeline):
@@ -56,24 +57,41 @@ class TorchClassifierPipeline(Pipeline):
         stream_out_spec: dict,
         stream_in_specs: list[dict],
         logging_spec: LoggingSpec,
-        is_async_generate: bool = False,
         port_pub: str = PORT_BACKEND,
         port_sub: str = PORT_FRONTEND,
         port_sync: str = PORT_SYNC_HOST,
         port_killsig: str = PORT_KILL,
         **_,
     ):
-        # TODO: wrap AI compute in a separate process to not stall ZeroMQ.
-        self._model: Module = build_model(
-            file_path=stream_out_spec["file_path"],
-            class_name=stream_out_spec["class_name"],
-            module_params=stream_out_spec["module_params"],
-            checkpoint_path=stream_out_spec["checkpoint_path"],
+        # Wrap AI compute in a separate process to not stall ZeroMQ.
+        self._is_ready_event = Event()
+        self._is_keep_data_event = Event()
+        self._is_stop_new_data_event = Event()
+        self._is_cleanup_event = Event()
+        self._is_finished_event = Event()
+        self._input_queue: Queue[tuple[str, dict]] = Queue()
+        self._output_queue: Queue[tuple[np.ndarray, int, float, float]] = Queue()
+
+        self._handler_proc = Process(
+            target=launch_handler,
+            args=(TorchClassifierHandler,),
+            kwargs={
+                "ref_time_s": logging_spec.ref_time_s,
+                "file_path": stream_out_spec["file_path"],
+                "class_name": stream_out_spec["class_name"],
+                "module_params": stream_out_spec["module_params"],
+                "checkpoint_path": stream_out_spec["checkpoint_path"],
+                "is_ready_event": self._is_ready_event,
+                "is_keep_data_event": self._is_keep_data_event,
+                "is_stop_new_data_event": self._is_stop_new_data_event,
+                "is_cleanup_event": self._is_cleanup_event,
+                "is_finished_event": self._is_finished_event,
+                "input_queue": self._input_queue,
+                "output_queue": self._output_queue,
+            },
         )
-        # Inference-only mode.
-        self._model.eval()
-        # Globally turn off gradient accumulation.
-        torch.set_grad_enabled(False)
+        self._handler_proc.start()
+        self._is_ready_event.wait()
 
         stream_out_spec = {
             "classes": stream_out_spec["module_params"]["output_classes"],
@@ -85,7 +103,7 @@ class TorchClassifierPipeline(Pipeline):
             stream_out_spec=stream_out_spec,
             stream_in_specs=stream_in_specs,
             logging_spec=logging_spec,
-            is_async_generate=is_async_generate,
+            is_async_generate=True,
             port_pub=port_pub,
             port_sub=port_sub,
             port_sync=port_sync,
@@ -97,29 +115,31 @@ class TorchClassifierPipeline(Pipeline):
         return TorchClassifierStream(**stream_spec)
 
     def _keep_samples(self):
-        pass
+        self._is_keep_data_event.set()
 
     def _process_data(self, topic: str, msg: dict) -> None:
-        # TODO: put the data into the user-selected type of alignment mechanism.
-        # TODO: push ready data into the IPC queue for PyTorch subprocess to asynchronously compute and not stall ZeroMQ.
-        start_time_s: float = get_time()
-        logits, prediction = self._model(topic, msg["data"])
-        end_time_s: float = get_time()
+        # TODO: put the data into the user-selected type of alignment mechanism, before pushing into PyTorch subprocess.
+        self._input_queue.put_nowait((topic, msg["data"]))
 
-        data = {
-            "prediction": prediction,
-            "logits": logits,
-            "compute_time_s": end_time_s - start_time_s,
-        }
-        tag: str = "%s.data" % self._log_source_tag()
+    def _generate_data(self) -> None:
+        try:
+            # Get data from the AI model without blocking.
+            logits, prediction, start_time_s, end_time_s = self._output_queue.get_nowait()
+            data = {
+                "prediction": prediction,
+                "logits": logits,
+                "compute_time_s": end_time_s - start_time_s,
+            }
+            tag: str = "%s.data" % self._log_source_tag()
+            self._publish(tag, process_time_s=end_time_s, data={"classifier": data})
+        except Empty:
+            if self._is_finished_event.is_set():
+                self._notify_no_more_data_out()
 
-        self._publish(tag, process_time_s=end_time_s, data={"classifier": data})
-
-    def _generate_data(self):
-        pass
-
-    def _stop_new_data(self):
-        pass
+    def _stop_new_data(self) -> None:
+        self._is_stop_new_data_event.set()
 
     def _cleanup(self) -> None:
+        self._is_cleanup_event.set()
+        self._handler_proc.join()
         super()._cleanup()

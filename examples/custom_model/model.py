@@ -73,31 +73,33 @@ class TCN(Module):
     def load_state_dict(self, state_dict, strict = True, assign = False):
         return self._tcn.load_state_dict(state_dict, strict, assign)
 
-    def forward(self, topic, data):
-        acc = data["dots-imu"]["acceleration"]
-        gyr = data["dots-imu"]["gyroscope"]
+    def forward(self, topic: str, data: dict) -> tuple[np.ndarray, int] | None:
+        if topic == "dots":
+            acc = data["dots-imu"]["acceleration"]
+            gyr = data["dots-imu"]["gyroscope"]
 
-        for i, sample in enumerate(np.concatenate((acc, gyr), axis=1)):
-            if all(map(lambda el: not np.isnan(el), sample)):
-                # Pre-process valid sample.
-                norm_sample, self._zi, self._count, self._mean, self._var = normalize(
-                    sample,
-                    self._b,
-                    self._a,
-                    self._zi,
-                    self._count,
-                    self._mean,
-                    self._var,
-                )
-                self._buffers[i].append(norm_sample)
+            for i, sample in enumerate(np.concatenate((acc, gyr), axis=1)):
+                if all(map(lambda el: not np.isnan(el), sample)):
+                    # Pre-process valid sample.
+                    norm_sample, self._zi, self._count, self._mean, self._var = normalize(
+                        sample,
+                        self._b,
+                        self._a,
+                        self._zi,
+                        self._count,
+                        self._mean,
+                        self._var,
+                    )
+                    self._buffers[i].append(norm_sample)
 
-        x = torch.tensor(
-            np.concatenate([buf[-1] for buf in self._buffers]), dtype=torch.float32
-        )[None, :, None]
+            x = torch.tensor(
+                np.concatenate([buf[-1] for buf in self._buffers]), dtype=torch.float32
+            )[None, :, None]
 
-        y: torch.Tensor = self._tcn(x)
-        logits = y.squeeze().numpy()
-        prediction = y.squeeze().argmax().item()
-        prediction, self._smooth_state = smooth(prediction, self._smooth_state)
-
-        return logits, prediction
+            y: torch.Tensor = self._tcn(x)
+            logits = y.squeeze().numpy()
+            prediction = y.squeeze().argmax().item()
+            prediction, self._smooth_state = smooth(prediction, self._smooth_state)
+            return logits, prediction
+        else:
+            return None
