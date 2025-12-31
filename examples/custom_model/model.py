@@ -70,7 +70,10 @@ class TCN(Module):
             deque([np.zeros(input_size[1])], maxlen=1) for _ in range(input_size[0])
         ]
 
-    def forward(self, data):
+    def load_state_dict(self, state_dict, strict = True, assign = False):
+        return self._tcn.load_state_dict(state_dict, strict, assign)
+
+    def forward(self, topic, data):
         acc = data["dots-imu"]["acceleration"]
         gyr = data["dots-imu"]["gyroscope"]
 

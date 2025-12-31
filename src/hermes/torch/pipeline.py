@@ -100,10 +100,10 @@ class TorchClassifierPipeline(Pipeline):
         pass
 
     def _process_data(self, topic: str, msg: dict) -> None:
-        # TODO: put data into the IPC queues for PyTorch subprocess to asynchronously compute and not stall ZeroMQ.
-
+        # TODO: put the data into the user-selected type of alignment mechanism.
+        # TODO: push ready data into the IPC queue for PyTorch subprocess to asynchronously compute and not stall ZeroMQ.
         start_time_s: float = get_time()
-        logits, prediction = self._model(msg["data"])
+        logits, prediction = self._model(topic, msg["data"])
         end_time_s: float = get_time()
 
         data = {

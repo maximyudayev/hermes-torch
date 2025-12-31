@@ -1,0 +1,4 @@
+pysio-hermes-dots
+pytorch-tcn
+numpy==1.26.*
+movelladot-pc-sdk

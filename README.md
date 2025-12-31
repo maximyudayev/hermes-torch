@@ -32,12 +32,13 @@ Using PyTorch AI models follows the standard [configuration file specification](
 1. Prepare your PyTorch model in a regular workflow - design, train, and export a `.pth` checkpoint.
 1. Provide the path in the HERMES config file to both, the checkpoint file and the module containing the `nn.Module` architecture.
 1. Specify the input modalities the AI model should receive for its computations under [`stream_in_specs`](https://github.com/maximyudayev/hermes-torch/blob/main/examples/torch.yml#L101-L122).
+1. Override `forward` and (optionally) `load_state_dict` methods on your custom `nn.Module` class, where needed. [Realtime TCN](https://github.com/maximyudayev/hermes-torch/blob/main/examples/model.py) example implementation for the freezing-of-gait proof-of-concept uses internal logic for non-torch filtering and normalization, and contains non-torch object parameters: it required a method override for successful loading of the model's state dictionary from a trained checkpoint file.
 
 > [!IMPORTANT]
 > Ensure that the state dictionary of the `.pth` can be successfully loaded into the model: provide the same model hyperparameters as the ones used to construct the model for training under [`stream_out_spec.module_params`](https://github.com/maximyudayev/hermes-torch/blob/main/examples/torch.yml#L92-L99).
 
 > [!IMPORTANT]
-> HERMES will push data from the middleware to the model input in `process_data` in an event-driven way. Samples from one or more modalities may be available in each iteration of the call. It is currently the responsibility of the user to buffer or fuse the incoming multi-modal samples within the `nn.Module` to build up receptive fields of desired function. The `process_data` guarantees that the per-modality `Queue` connected to the model's input has the most recent sample only.
+> HERMES will push data from the middleware to the model input in `process_data` in an event-driven way. Samples from one or more modalities may be available in each iteration of the call. It is currently the responsibility of the user to buffer or fuse the incoming multi-modal samples within the `nn.Module` to build up receptive fields of desired function.
 
 ### (Optional) Dedicated `Node`
 You can optionally inherit from `TorchClassifierPipeline`, or `Pipeline` directly, to create a dedicated (hardcoded) `Node` for the target AI algorithm, similar to the HERMES extension process with support for new sensors (e.g. a `TorchRegressionPipeline`, `TorchEmbeddingPipeline`, etc., some of which are on the current development roadmap).
