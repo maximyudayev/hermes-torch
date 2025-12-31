@@ -8,5 +8,5 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## HERMES PyTorch
 
-### 0.0.1 <small>Month Day, Year</small>
+### 0.0.1 <small>December 31, 2025</small>
 - Initial public release of an optional PyTorch AI processing HERMES package.
