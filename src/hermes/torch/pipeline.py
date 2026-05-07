@@ -46,13 +46,9 @@ from .handler import TorchClassifierHandler
 class TorchClassifierPipeline(Pipeline):
     """A class for processing realtime sensor data with a custom PyTorch AI model."""
 
-    # TODO: make the log name assignable.
-    @classmethod
-    def _log_source_tag(cls) -> str:
-        return "ai"
-
     def __init__(
         self,
+        topic: str,
         host_ip: str,
         stream_out_spec: dict,
         stream_in_specs: list[dict],
@@ -99,6 +95,7 @@ class TorchClassifierPipeline(Pipeline):
         }
 
         super().__init__(
+            topic=topic,
             host_ip=host_ip,
             stream_out_spec=stream_out_spec,
             stream_in_specs=stream_in_specs,
@@ -130,7 +127,7 @@ class TorchClassifierPipeline(Pipeline):
                 "logits": logits,
                 "compute_time_s": end_time_s - start_time_s,
             }
-            tag: str = "%s.data" % self._log_source_tag()
+            tag: str = "%s.data" % self.topic
             self._publish(tag, process_time_s=end_time_s, data={"classifier": data})
         except Empty:
             if self._is_finished_event.is_set():
