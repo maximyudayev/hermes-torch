@@ -28,13 +28,19 @@
 from collections import OrderedDict
 from math import ceil, log2
 
-from hermes.base.stream import Stream
+from hermes.base.data_container import DataContainer
 
 
-class TorchClassifierStream(Stream):
+class TorchClassifierDataContainer(DataContainer):
     """A structure to store PyTorch prediction outputs."""
 
-    def __init__(self, classes: list[str], sampling_rate_hz: float, **_) -> None:
+    def __init__(
+        self,
+        classes: list[str],
+        buf_len: int,
+        sampling_rate_hz: float,
+        **_,
+    ) -> None:
         super().__init__()
 
         self._device_name = "classifier"
@@ -44,27 +50,30 @@ class TorchClassifierStream(Stream):
 
         self._define_data_notes()
 
-        self.add_stream(
-            device_name=self._device_name,
-            stream_name="prediction",
+        self.add_channel(
+            bundle_name=self._device_name,
+            channel_name="prediction",
             data_type=f"uint{bit_width}",
             sample_size=[1],
+            buf_len=buf_len,
             sampling_rate_hz=sampling_rate_hz,
             data_notes=self._data_notes[self._device_name]["prediction"],
             is_measure_rate_hz=True,
         )
-        self.add_stream(
-            device_name=self._device_name,
-            stream_name="logits",
+        self.add_channel(
+            bundle_name=self._device_name,
+            channel_name="logits",
             data_type="float64",
             sample_size=[len(classes)],
+            buf_len=buf_len,
             data_notes=self._data_notes[self._device_name]["logits"],
         )
-        self.add_stream(
-            device_name=self._device_name,
-            stream_name="compute_time_s",
+        self.add_channel(
+            bundle_name=self._device_name,
+            channel_name="compute_time_s",
             data_type="float64",
             sample_size=[1],
+            buf_len=buf_len,
             data_notes=self._data_notes[self._device_name]["compute_time_s"],
         )
 
@@ -79,7 +88,7 @@ class TorchClassifierStream(Stream):
             [
                 ("Description", "Probability vector"),
                 ("Range", "[0,1]"),
-                (Stream.metadata_data_headings_key, self._classes),
+                (DataContainer.metadata_data_headings_key, self._classes),
             ]
         )
         self._data_notes[self._device_name]["prediction"] = OrderedDict(

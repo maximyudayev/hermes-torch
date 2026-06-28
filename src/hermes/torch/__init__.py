@@ -1,2 +1,2 @@
-from .stream import TorchClassifierStream
+from .data_container import TorchClassifierDataContainer
 from .pipeline import TorchClassifierPipeline

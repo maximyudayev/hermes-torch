@@ -27,6 +27,7 @@
 
 from multiprocessing import Process, Event, Queue
 from queue import Empty
+from typing import Optional
 import numpy as np
 
 from hermes.base.nodes.pipeline import Pipeline
@@ -39,8 +40,8 @@ from hermes.utils.zmq_utils import (
     PORT_KILL,
 )
 
-from .stream import TorchClassifierStream
-from .handler import TorchClassifierHandler
+from hermes.torch.data_container import TorchClassifierDataContainer
+from hermes.torch.handler import TorchClassifierHandler
 
 
 class TorchClassifierPipeline(Pipeline):
@@ -50,13 +51,13 @@ class TorchClassifierPipeline(Pipeline):
         self,
         topic: str,
         host_ip: str,
-        stream_out_spec: dict,
-        stream_in_specs: list[dict],
+        data_out_spec: dict,
+        data_in_specs: list[dict],
         logging_spec: LoggingSpec,
-        port_pub: str = PORT_BACKEND,
-        port_sub: str = PORT_FRONTEND,
-        port_sync: str = PORT_SYNC_HOST,
-        port_killsig: str = PORT_KILL,
+        port_pub: Optional[str] = PORT_BACKEND,
+        port_sub: Optional[str] = PORT_FRONTEND,
+        port_sync: Optional[str] = PORT_SYNC_HOST,
+        port_killsig: Optional[str] = PORT_KILL,
         **_,
     ):
         # Wrap AI compute in a separate process to not stall ZeroMQ.
@@ -73,10 +74,10 @@ class TorchClassifierPipeline(Pipeline):
             args=(TorchClassifierHandler,),
             kwargs={
                 "ref_time_s": logging_spec.ref_time_s,
-                "file_path": stream_out_spec["file_path"],
-                "class_name": stream_out_spec["class_name"],
-                "module_params": stream_out_spec["module_params"],
-                "checkpoint_path": stream_out_spec["checkpoint_path"],
+                "file_path": data_out_spec["file_path"],
+                "class_name": data_out_spec["class_name"],
+                "module_params": data_out_spec["module_params"],
+                "checkpoint_path": data_out_spec["checkpoint_path"],
                 "is_ready_event": self._is_ready_event,
                 "is_keep_data_event": self._is_keep_data_event,
                 "is_stop_new_data_event": self._is_stop_new_data_event,
@@ -89,16 +90,17 @@ class TorchClassifierPipeline(Pipeline):
         self._handler_proc.start()
         self._is_ready_event.wait()
 
-        stream_out_spec = {
-            "classes": stream_out_spec["module_params"]["output_classes"],
-            "sampling_rate_hz": stream_out_spec["module_params"]["sampling_rate_hz"],
+        data_out_spec = {
+            "classes": data_out_spec["module_params"]["output_classes"],
+            "buf_len": data_out_spec["buf_len"],
+            "sampling_rate_hz": data_out_spec["module_params"]["sampling_rate_hz"],
         }
 
         super().__init__(
             topic=topic,
             host_ip=host_ip,
-            stream_out_spec=stream_out_spec,
-            stream_in_specs=stream_in_specs,
+            data_out_spec=data_out_spec,
+            data_in_specs=data_in_specs,
             logging_spec=logging_spec,
             is_async_generate=True,
             port_pub=port_pub,
@@ -108,8 +110,8 @@ class TorchClassifierPipeline(Pipeline):
         )
 
     @classmethod
-    def create_stream(cls, stream_spec: dict) -> TorchClassifierStream:
-        return TorchClassifierStream(**stream_spec)
+    def create_data_container(cls, data_spec: dict) -> TorchClassifierDataContainer:
+        return TorchClassifierDataContainer(**data_spec)
 
     def _keep_samples(self):
         self._is_keep_data_event.set()

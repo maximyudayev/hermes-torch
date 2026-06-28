@@ -39,6 +39,7 @@ remote_kill_ip: null
 
 logging_spec:
   stream_period_s     : 30
+  is_quiet            : False
 
   stream_hdf5         : True
   stream_csv          : False
@@ -73,6 +74,7 @@ producer_specs:
         foot_left       : "D422CD0091A9"
       master_device     : "pelvis"
       num_joints        : 5
+      buf_len           : 3000
       sampling_rate_hz  : 60
       payload_mode      : "RateQuantitieswMag"
       filter_profile    : "General"
@@ -88,10 +90,11 @@ pipeline_specs:
     class: "TorchClassifierPipeline"
     topic: "torch"
     settings:
-      stream_out_spec:
+      data_out_spec:
         file_path: "examples/custom_model/model.py"
         class_name: "TCN"
         checkpoint_path: "examples/custom_model/tcn_model_60fps.pth"
+        buf_len: 100000
         module_params:
           input_size:
             - 5
@@ -101,7 +104,7 @@ pipeline_specs:
             - "freezing"
           sampling_rate_hz: 60
 
-      stream_in_specs:
+      data_in_specs:
         - package: "dots"
           class: "DotsOemProducer"
           topic: "dots"
@@ -120,6 +123,7 @@ pipeline_specs:
               foot_left       : "D422CD0091A9"
             master_device     : "pelvis"
             num_joints        : 5
+            buf_len           : 3000
             sampling_rate_hz  : 60
             payload_mode      : "RateQuantitieswMag"
             filter_profile    : "General"
